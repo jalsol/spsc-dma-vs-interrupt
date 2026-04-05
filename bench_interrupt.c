@@ -3,18 +3,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <unistd.h>
 
-#define DEVICE_PATH "/dev/dev_interrupt"
-#define NUM_OPS 1000000
-#define BATCH_SIZE 1024
+#include "bench_common.h"
 
-static uint64_t get_ns(void) {
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-}
+#define DEVICE_PATH "/dev/dev_interrupt"
+#define BATCH_SIZE 1024
 
 int main(void) {
   int fd = open(DEVICE_PATH, O_RDONLY);
@@ -44,11 +38,7 @@ int main(void) {
 
   uint64_t elapsed = get_ns() - start;
 
-  printf("\nResults:\n");
-  printf("  Operations:  %zu\n", total);
-  printf("  Time:        %.3f sec\n", elapsed / 1e9);
-  printf("  Throughput:  %.0f ops/sec\n", total / (elapsed / 1e9));
-  printf("  Latency:     %.0f ns/op\n", (double)elapsed / total);
+  print_results(total, elapsed);
 
   free(buf);
   close(fd);

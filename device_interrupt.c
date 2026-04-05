@@ -10,8 +10,9 @@
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 
+#include "common.h"
+
 #define DEVICE_NAME "dev_interrupt"
-#define BUFFER_SIZE 4096
 
 struct device_state {
   uint32_t buffer[BUFFER_SIZE];
@@ -26,10 +27,6 @@ static dev_t dev_num;
 static struct class *dev_class;
 static struct cdev dev_cdev;
 static struct device_state *state;
-
-static inline uint32_t next_pos(uint32_t pos) {
-  return (pos + 1) % BUFFER_SIZE;
-}
 
 static inline bool buffer_empty(void) {
   return state->read_pos == state->write_pos;

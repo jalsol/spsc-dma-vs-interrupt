@@ -4,30 +4,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
-#include <time.h>
 #include <unistd.h>
 
+#include "bench_common.h"
+#include "common.h"
+
 #define DEVICE_PATH "/dev/dev_dma"
-#define BUFFER_SIZE 4096
-#define NUM_OPS 1000000
-
-struct dma_shared {
-  volatile uint32_t write_pos;
-  uint8_t pad1[60];
-  volatile uint32_t read_pos;
-  uint8_t pad2[60];
-  uint32_t buffer[BUFFER_SIZE];
-} __attribute__((aligned(64)));
-
-static inline uint32_t next_pos(uint32_t pos) {
-  return (pos + 1) % BUFFER_SIZE;
-}
-
-static uint64_t get_ns(void) {
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-}
 
 int main(void) {
   int fd = open(DEVICE_PATH, O_RDWR);
@@ -65,11 +47,7 @@ int main(void) {
 
   uint64_t elapsed = get_ns() - start;
 
-  printf("\nResults:\n");
-  printf("  Operations:  %zu\n", total);
-  printf("  Time:        %.3f sec\n", elapsed / 1e9);
-  printf("  Throughput:  %.0f ops/sec\n", total / (elapsed / 1e9));
-  printf("  Latency:     %.0f ns/op\n", (double)elapsed / total);
+  print_results(total, elapsed);
 
   munmap(mem, sizeof(struct dma_shared));
   close(fd);

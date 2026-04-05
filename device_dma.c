@@ -10,16 +10,9 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 
-#define DEVICE_NAME "dev_dma"
-#define BUFFER_SIZE 4096
+#include "common.h"
 
-struct dma_shared {
-  volatile uint32_t write_pos;
-  uint8_t pad1[60];
-  volatile uint32_t read_pos;
-  uint8_t pad2[60];
-  uint32_t buffer[BUFFER_SIZE];
-} __attribute__((aligned(64)));
+#define DEVICE_NAME "dev_dma"
 
 struct device_state {
   struct dma_shared *shared;
@@ -32,10 +25,6 @@ static dev_t dev_num;
 static struct class *dev_class;
 static struct cdev dev_cdev;
 static struct device_state *state;
-
-static inline uint32_t next_pos(uint32_t pos) {
-  return (pos + 1) % BUFFER_SIZE;
-}
 
 static inline bool buffer_full(void) {
   return next_pos(state->shared->write_pos) == state->shared->read_pos;
