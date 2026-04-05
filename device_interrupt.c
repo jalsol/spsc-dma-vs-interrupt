@@ -87,8 +87,10 @@ static int dev_open(struct inode *inode, struct file *file) {
 
 static int dev_release(struct inode *inode, struct file *file) {
   atomic_set(&state->running, 0);
-  if (state->producer)
+  if (state->producer) {
     kthread_stop(state->producer);
+    state->producer = NULL;
+  }
   return 0;
 }
 

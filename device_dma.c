@@ -15,7 +15,9 @@
 
 struct dma_shared {
   volatile uint32_t write_pos;
+  uint8_t pad1[60];
   volatile uint32_t read_pos;
+  uint8_t pad2[60];
   uint32_t buffer[BUFFER_SIZE];
 } __attribute__((aligned(64)));
 
@@ -69,8 +71,10 @@ static int dev_open(struct inode *inode, struct file *file) {
 
 static int dev_release(struct inode *inode, struct file *file) {
   atomic_set(&state->running, 0);
-  if (state->producer)
+  if (state->producer) {
     kthread_stop(state->producer);
+    state->producer = NULL;
+  }
   return 0;
 }
 

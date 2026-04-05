@@ -13,7 +13,9 @@
 
 struct dma_shared {
   volatile uint32_t write_pos;
+  uint8_t pad1[60];
   volatile uint32_t read_pos;
+  uint8_t pad2[60];
   uint32_t buffer[BUFFER_SIZE];
 } __attribute__((aligned(64)));
 
