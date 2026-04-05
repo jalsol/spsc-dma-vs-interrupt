@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#define NUM_OPS 1000000
+#define NUM_OPS 100000000
 
 static inline uint64_t get_ns(void) {
   struct timespec ts;
