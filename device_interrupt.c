@@ -56,18 +56,23 @@ static ssize_t dev_read(struct file *f, char __user *buf, size_t len,
   uint32_t value;
 
   while (count < len && count < BUFFER_SIZE * sizeof(uint32_t)) {
-    if (buffer_empty()) {
+    uint32_t local_read_pos = state->read_pos;
+    uint32_t local_write_pos = state->write_pos;
+    
+    if (local_read_pos == local_write_pos) {
       if (f->f_flags & O_NONBLOCK)
         break;
       if (wait_event_interruptible(state->wait_queue, !buffer_empty()))
         return -ERESTARTSYS;
+      local_read_pos = state->read_pos;
+      local_write_pos = state->write_pos;
     }
 
-    if (buffer_empty())
+    if (local_read_pos == local_write_pos)
       break;
 
-    value = state->buffer[state->read_pos];
-    state->read_pos = next_pos(state->read_pos);
+    value = state->buffer[local_read_pos];
+    state->read_pos = next_pos(local_read_pos);
 
     if (copy_to_user(buf + count, &value, sizeof(uint32_t)))
       return -EFAULT;

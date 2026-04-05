@@ -32,17 +32,19 @@ int main(void) {
   size_t total = 0;
 
   while (total < NUM_OPS) {
-    /* Poll for data */
-    while (mem->read_pos == mem->write_pos)
+    uint32_t local_read_pos = mem->read_pos;
+    
+    while (local_read_pos == mem->write_pos) {
       __asm__ __volatile__("pause" ::: "memory");
+      local_read_pos = mem->read_pos;
+    }
 
-    /* Read from shared memory */
-    uint32_t value = mem->buffer[mem->read_pos];
+    uint32_t value = mem->buffer[local_read_pos];
     __sync_synchronize();
-    mem->read_pos = next_pos(mem->read_pos);
+    mem->read_pos = next_pos(local_read_pos);
     total++;
 
-    (void)value; /* Prevent optimization */
+    (void)value;
   }
 
   uint64_t elapsed = get_ns() - start;
