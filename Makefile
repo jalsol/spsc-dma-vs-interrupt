@@ -1,8 +1,10 @@
 obj-m += device_interrupt.o
 obj-m += device_dma.o
 
-# Use available kernel headers (module version mismatch handled with -f flag)
-KDIR := /lib/modules/6.19.8-arch1-1/build
+# Build against the currently running kernel by default.
+# Can be overridden, e.g. `make KREL=...`.
+KREL ?= $(shell uname -r)
+KDIR ?= /lib/modules/$(KREL)/build
 PWD := $(shell pwd)
 
 all: modules bench
@@ -19,8 +21,8 @@ clean:
 	rm -f bench_interrupt bench_dma
 
 load:
-	sudo insmod -f device_interrupt.ko
-	sudo insmod -f device_dma.ko
+	sudo insmod device_interrupt.ko
+	sudo insmod device_dma.ko
 	sudo chmod 666 /dev/dev_interrupt /dev/dev_dma
 
 unload:
@@ -32,8 +34,8 @@ run:
 	-sudo rmmod device_interrupt 2>/dev/null || true
 	-sudo rmmod device_dma 2>/dev/null || true
 	@echo "=== Loading modules ==="
-	sudo insmod -f device_interrupt.ko
-	sudo insmod -f device_dma.ko
+	sudo insmod device_interrupt.ko
+	sudo insmod device_dma.ko
 	sudo chmod 666 /dev/dev_interrupt /dev/dev_dma
 	@echo ""
 	@echo "=== Interrupt-driven ==="

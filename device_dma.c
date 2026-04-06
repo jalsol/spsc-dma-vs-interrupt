@@ -136,3 +136,4 @@ static void __exit dev_exit(void) {
 module_init(dev_init);
 module_exit(dev_exit);
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("DMA shared-memory SPSC benchmark device");
