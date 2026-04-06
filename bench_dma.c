@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sched.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -10,6 +11,7 @@
 #include "common.h"
 
 #define DEVICE_PATH "/dev/dev_dma"
+#define SPIN_BEFORE_YIELD 2048
 
 int main(void) {
   int fd = open(DEVICE_PATH, O_RDWR);
@@ -32,16 +34,23 @@ int main(void) {
   size_t total = 0;
 
   while (total < NUM_OPS) {
-    uint32_t local_read_pos = mem->read_pos;
-    
-    while (local_read_pos == mem->write_pos) {
+    uint32_t local_read_pos = __atomic_load_n(&mem->read_pos, __ATOMIC_RELAXED);
+    uint32_t local_write_pos =
+        __atomic_load_n(&mem->write_pos, __ATOMIC_ACQUIRE);
+    uint32_t spin_count = 0;
+
+    while (local_read_pos == local_write_pos) {
       __asm__ __volatile__("pause" ::: "memory");
-      local_read_pos = mem->read_pos;
+      if (++spin_count == SPIN_BEFORE_YIELD) {
+        sched_yield();
+        spin_count = 0;
+      }
+      local_read_pos = __atomic_load_n(&mem->read_pos, __ATOMIC_RELAXED);
+      local_write_pos = __atomic_load_n(&mem->write_pos, __ATOMIC_ACQUIRE);
     }
 
     uint32_t value = mem->buffer[local_read_pos];
-    __sync_synchronize();
-    mem->read_pos = next_pos(local_read_pos);
+    __atomic_store_n(&mem->read_pos, next_pos(local_read_pos), __ATOMIC_RELEASE);
     total++;
 
     (void)value;

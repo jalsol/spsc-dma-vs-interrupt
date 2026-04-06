@@ -8,6 +8,9 @@
 #endif
 
 #define BUFFER_SIZE 4096
+#if (BUFFER_SIZE & (BUFFER_SIZE - 1)) != 0
+#error "BUFFER_SIZE must be a power of two"
+#endif
 
 struct dma_shared {
   volatile uint32_t write_pos;
@@ -18,7 +21,7 @@ struct dma_shared {
 } __attribute__((aligned(64)));
 
 static inline uint32_t next_pos(uint32_t pos) {
-  return (pos + 1) % BUFFER_SIZE;
+  return (pos + 1) & (BUFFER_SIZE - 1);
 }
 
 #endif

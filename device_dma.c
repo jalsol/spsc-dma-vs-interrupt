@@ -27,16 +27,20 @@ static struct cdev dev_cdev;
 static struct device_state *state;
 
 static inline bool buffer_full(void) {
-  return next_pos(state->shared->write_pos) == state->shared->read_pos;
+  uint32_t write_pos = READ_ONCE(state->shared->write_pos);
+  uint32_t read_pos = READ_ONCE(state->shared->read_pos);
+  return next_pos(write_pos) == read_pos;
 }
 
 static int producer_thread(void *data) {
   uint32_t value = 0;
   while (!kthread_should_stop() && atomic_read(&state->running)) {
-    if (!buffer_full()) {
-      state->shared->buffer[state->shared->write_pos] = value++;
-      smp_wmb();
-      state->shared->write_pos = next_pos(state->shared->write_pos);
+    uint32_t write_pos = READ_ONCE(state->shared->write_pos);
+    uint32_t read_pos = smp_load_acquire(&state->shared->read_pos);
+
+    if (next_pos(write_pos) != read_pos) {
+      state->shared->buffer[write_pos] = value++;
+      smp_store_release(&state->shared->write_pos, next_pos(write_pos));
     }
     if (value % 1000 == 0)
       usleep_range(1, 10);
