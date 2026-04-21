@@ -12,7 +12,7 @@
 #error "BUFFER_SIZE must be a power of two"
 #endif
 
-struct dma_shared {
+struct polling_shared {
   volatile uint32_t write_pos;
   uint8_t pad1[60];
   volatile uint32_t read_pos;
@@ -21,7 +21,11 @@ struct dma_shared {
 } __attribute__((aligned(64)));
 
 static inline uint32_t next_pos(uint32_t pos) {
-  return (pos + 1) & (BUFFER_SIZE - 1);
+  return pos + 1;
+}
+
+static inline uint32_t ring_index(uint32_t pos) {
+  return pos & (BUFFER_SIZE - 1);
 }
 
 #endif

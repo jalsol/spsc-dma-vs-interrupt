@@ -1,5 +1,5 @@
 /*
- * DMA device: generates data directly to shared memory, userspace polls
+ * Polling device: generates data directly to shared memory, userspace polls
  */
 #include <asm/io.h>
 #include <linux/cdev.h>
@@ -12,10 +12,10 @@
 
 #include "common.h"
 
-#define DEVICE_NAME "dev_dma"
+#define DEVICE_NAME "dev_polling"
 
 struct device_state {
-  struct dma_shared *shared;
+  struct polling_shared *shared;
   struct page *pages;
   struct task_struct *producer;
   atomic_t running;
@@ -29,7 +29,7 @@ static struct device_state *state;
 static inline bool buffer_full(void) {
   uint32_t write_pos = READ_ONCE(state->shared->write_pos);
   uint32_t read_pos = READ_ONCE(state->shared->read_pos);
-  return next_pos(write_pos) == read_pos;
+  return (write_pos - read_pos) >= BUFFER_SIZE;
 }
 
 static int producer_thread(void *data) {
@@ -38,8 +38,8 @@ static int producer_thread(void *data) {
     uint32_t write_pos = READ_ONCE(state->shared->write_pos);
     uint32_t read_pos = smp_load_acquire(&state->shared->read_pos);
 
-    if (next_pos(write_pos) != read_pos) {
-      state->shared->buffer[write_pos] = value++;
+    if ((write_pos - read_pos) < BUFFER_SIZE) {
+      state->shared->buffer[ring_index(write_pos)] = value++;
       smp_store_release(&state->shared->write_pos, next_pos(write_pos));
     }
     if (value % 1000 == 0)
@@ -85,11 +85,11 @@ static int __init dev_init(void) {
   if (!state)
     return -ENOMEM;
 
-  addr = __get_free_pages(GFP_KERNEL, get_order(sizeof(struct dma_shared)));
+  addr = __get_free_pages(GFP_KERNEL, get_order(sizeof(struct polling_shared)));
   if (!addr)
     goto fail_alloc;
 
-  state->shared = (struct dma_shared *)addr;
+  state->shared = (struct polling_shared *)addr;
   state->pages = virt_to_page(addr);
   SetPageReserved(state->pages);
 
@@ -107,7 +107,7 @@ static int __init dev_init(void) {
   if (IS_ERR(device_create(dev_class, NULL, dev_num, NULL, DEVICE_NAME)))
     goto fail_device;
 
-  pr_info("DMA device loaded\n");
+  pr_info("Polling device loaded\n");
   return 0;
 
 fail_device:
@@ -118,7 +118,7 @@ fail_cdev:
   unregister_chrdev_region(dev_num, 1);
 fail_chrdev:
   ClearPageReserved(state->pages);
-  free_pages(addr, get_order(sizeof(struct dma_shared)));
+  free_pages(addr, get_order(sizeof(struct polling_shared)));
 fail_alloc:
   kfree(state);
   return -1;
@@ -133,11 +133,11 @@ static void __exit dev_exit(void) {
   cdev_del(&dev_cdev);
   unregister_chrdev_region(dev_num, 1);
   ClearPageReserved(state->pages);
-  free_pages(addr, get_order(sizeof(struct dma_shared)));
+  free_pages(addr, get_order(sizeof(struct polling_shared)));
   kfree(state);
 }
 
 module_init(dev_init);
 module_exit(dev_exit);
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("DMA shared-memory SPSC benchmark device");
+MODULE_DESCRIPTION("Polling shared-memory SPSC benchmark device");

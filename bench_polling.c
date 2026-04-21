@@ -1,4 +1,4 @@
-/* Benchmark: DMA with polling */
+/* Benchmark: polling consumer over shared memory ring */
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -10,7 +10,7 @@
 #include "bench_common.h"
 #include "common.h"
 
-#define DEVICE_PATH "/dev/dev_dma"
+#define DEVICE_PATH "/dev/dev_polling"
 #define SPIN_BEFORE_YIELD 2048
 
 int main(void) {
@@ -20,7 +20,7 @@ int main(void) {
     return 1;
   }
 
-  struct dma_shared *mem = mmap(NULL, sizeof(struct dma_shared),
+  struct polling_shared *mem = mmap(NULL, sizeof(struct polling_shared),
                                 PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (mem == MAP_FAILED) {
     perror("mmap");
@@ -28,7 +28,7 @@ int main(void) {
     return 1;
   }
 
-  printf("DMA polling: reading %d items...\n", NUM_OPS);
+  printf("Polling: reading %d items...\n", NUM_OPS);
 
   uint64_t start = get_ns();
   size_t total = 0;
@@ -49,7 +49,7 @@ int main(void) {
       local_write_pos = __atomic_load_n(&mem->write_pos, __ATOMIC_ACQUIRE);
     }
 
-    uint32_t value = mem->buffer[local_read_pos];
+    uint32_t value = mem->buffer[ring_index(local_read_pos)];
     __atomic_store_n(&mem->read_pos, next_pos(local_read_pos), __ATOMIC_RELEASE);
     total++;
 
@@ -60,7 +60,7 @@ int main(void) {
 
   print_results(total, elapsed);
 
-  munmap(mem, sizeof(struct dma_shared));
+  munmap(mem, sizeof(struct polling_shared));
   close(fd);
   return 0;
 }

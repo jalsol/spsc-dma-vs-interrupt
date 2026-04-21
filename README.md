@@ -4,7 +4,7 @@ Fair benchmark comparing two kernel-userspace communication patterns for Single 
 
 ## Approaches
 
-### 1. DMA with Polling (`device_dma` / `bench_dma`)
+### 1. Polling (`device_polling` / `bench_polling`)
 - Kernel writes directly to shared memory
 - Userspace polls for new data
 - Zero syscalls in the hot path
@@ -19,19 +19,19 @@ Fair benchmark comparing two kernel-userspace communication patterns for Single 
 ## Code Structure
 
 ```
-common.h         - Shared definitions (BUFFER_SIZE, dma_shared struct, next_pos())
-bench_common.h   - Benchmark utilities (timing, result printing)
-device_dma.c     - Kernel module: shared memory producer
+common.h           - Shared definitions (BUFFER_SIZE, polling_shared struct, next_pos())
+bench_common.h     - Benchmark utilities (timing, result printing)
+device_polling.c   - Kernel module: shared memory producer
 device_interrupt.c - Kernel module: interrupt-driven producer
-bench_dma.c      - Userspace: polling consumer
-bench_interrupt.c - Userspace: syscall-based consumer
+bench_polling.c    - Userspace: polling consumer
+bench_interrupt.c  - Userspace: syscall-based consumer
 ```
 
 ## Build & Run
 
 ```bash
 make all        # Build kernel modules and benchmarks
-make run        # Run both benchmarks (needs sudo)
+make run        # Run benchmarks (needs sudo)
 ```
 
 **If modules are stuck:** Reboot your system. The kernel threads may not exit cleanly.
@@ -41,7 +41,7 @@ make run        # Run both benchmarks (needs sudo)
 ```bash
 make load          # Load kernel modules
 ./bench_interrupt  # Run interrupt benchmark
-./bench_dma        # Run polling benchmark
+./bench_polling    # Run polling benchmark
 make unload        # Unload modules
 ```
 
@@ -49,7 +49,7 @@ make unload        # Unload modules
 
 ```
 Interrupt-driven:  ~1-2M ops/sec, ~500-1000 ns/op
-DMA polling:       ~50-100M ops/sec, ~10-20 ns/op
+Polling:           ~50-100M ops/sec, ~10-20 ns/op
 Speedup:           50-100x faster
 ```
 
@@ -68,10 +68,10 @@ This is why DPDK, SPDK, and RDMA use polling for high-throughput workloads.
 ## Implementation Details
 
 ### Cache Line Padding
-The `dma_shared` struct uses 60-byte padding to separate `write_pos` and `read_pos` onto different cache lines (64 bytes), preventing false sharing between producer and consumer.
+The `polling_shared` struct uses 60-byte padding to separate `write_pos` and `read_pos` onto different cache lines (64 bytes), preventing false sharing between producer and consumer.
 
 ```c
-struct dma_shared {
+struct polling_shared {
   volatile uint32_t write_pos;  // Producer's cursor
   uint8_t pad1[60];             // Padding to next cache line
   volatile uint32_t read_pos;   // Consumer's cursor
@@ -87,7 +87,7 @@ Both benchmarks process **1 element per iteration** (1 million iterations total)
 
 **"Device or resource busy"**: Module already loaded
 ```bash
-sudo rmmod device_interrupt device_dma
+sudo rmmod device_interrupt device_polling
 ```
 
 **"Invalid module format"**: Kernel version mismatch

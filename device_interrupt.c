@@ -7,6 +7,7 @@
 #include <linux/fs.h>
 #include <linux/kthread.h>
 #include <linux/module.h>
+#include <linux/sched/signal.h>
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 
@@ -33,14 +34,14 @@ static inline bool buffer_empty(void) {
 }
 
 static inline bool buffer_full(void) {
-  return next_pos(state->write_pos) == state->read_pos;
+  return (state->write_pos - state->read_pos) >= BUFFER_SIZE;
 }
 
 static int producer_thread(void *data) {
   uint32_t value = 0;
   while (!kthread_should_stop() && atomic_read(&state->running)) {
     if (!buffer_full()) {
-      state->buffer[state->write_pos] = value++;
+      state->buffer[ring_index(state->write_pos)] = value++;
       state->write_pos = next_pos(state->write_pos);
       wake_up_interruptible(&state->wait_queue);
     }
@@ -56,14 +57,17 @@ static ssize_t dev_read(struct file *f, char __user *buf, size_t len,
   uint32_t value;
 
   while (count < len && count < BUFFER_SIZE * sizeof(uint32_t)) {
+    if (fatal_signal_pending(current))
+      return -EINTR;
+
     uint32_t local_read_pos = state->read_pos;
     uint32_t local_write_pos = state->write_pos;
     
     if (local_read_pos == local_write_pos) {
       if (f->f_flags & O_NONBLOCK)
         break;
-      if (wait_event_interruptible(state->wait_queue, !buffer_empty()))
-        return -ERESTARTSYS;
+      if (wait_event_killable(state->wait_queue, !buffer_empty()))
+        return -EINTR;
       local_read_pos = state->read_pos;
       local_write_pos = state->write_pos;
     }
@@ -71,7 +75,7 @@ static ssize_t dev_read(struct file *f, char __user *buf, size_t len,
     if (local_read_pos == local_write_pos)
       break;
 
-    value = state->buffer[local_read_pos];
+    value = state->buffer[ring_index(local_read_pos)];
     state->read_pos = next_pos(local_read_pos);
 
     if (copy_to_user(buf + count, &value, sizeof(uint32_t)))
